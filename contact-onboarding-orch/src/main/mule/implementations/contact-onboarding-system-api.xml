@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+
+	<flow name="contact-onboarding-message-consumer-flow" doc:id="1525f76d-d382-4df2-bab8-4b9ac7318e0b" >
+		<jms:listener doc:name="Receive Contact Onboarding JMS Message" 
+              doc:id="ce9112fc-932a-478f-b491-8ab215a5401c" 
+              config-ref="JMS_Config" 
+              destination="${jms.queueName}" 
+              ackMode="MANUAL">
+		    <jms:consumer-type>
+		        <jms:queue-consumer />
+		    </jms:consumer-type>
+		</jms:listener>
+
+		<!-- Step 1: Capture attributes FIRST before transforming payload -->
+		<set-variable value="#[attributes.ackId]" doc:name="Save Ack ID" doc:id="9cda17fc-a6b3-4383-8b3c-6a158dce2aa0" variableName="ackId"/>
+		<set-variable value="#[attributes.properties.CorrelationId default uuid()]" doc:name="Initialize Correlation Identifier" doc:id="bb206127-aa5f-45fd-9dba-f607849f2431" variableName="correlationId"/>
+
+		<!-- Step 2: Now safely parse raw JMS text message to JSON -->
+		<ee:transform doc:name="Parse Contact Onboarding Payload to JSON" doc:id="4f4919f0-4074-4c38-b2d2-f692546c33db" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+if (payload is String) read(payload, "application/json") else payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+
+		<logger level="INFO" doc:name="Log Contact Onboarding Message Receipt" doc:id="1a060243-f6fb-4500-a38d-8c233480157f" message='#["CONTACT_ONBOARDING_MESSAGE_RECEIVED | CorrelationId=" ++ (vars.correlationId default "")]'/>
+
+		<!-- Step 3: Validate message body -->
+		<flow-ref doc:name="Validate Contact Onboarding Message" doc:id="08c1098a-d136-4a04-a234-6916b3fe6ebf" name="contact-onboarding-message-validation-subflow"/>
+		
+		<!-- Step 4: Execute Database Insertion Subflow / Component -->
+		<flow-ref doc:name="Build and Insert Contact Onboarding Database Record" doc:id="88012abe-f1de-42b6-b43c-68f004da7569" name="contact-database-payload-builder-subflow"/>
+
+		<!-- Step 5: Acknowledge Message in JMS Queue ONLY AFTER DB Insert succeeds -->
+		<flow-ref doc:name="Persist Contact Onboarding Record" doc:id="619111ca-c0e2-4268-b234-50b5352a5dd6" name="contact-database-upsert-subflow"/>
+		<jms:ack doc:name="Acknowledge JMS Message" doc:id="e65d6e12-1035-493d-9e7b-06cc8dddc1da" ackId="#[vars.ackId]"/>
+
+		<error-handler>
+			<!-- Validation Errors: Move to DLQ and ACK original queue message -->
+			<on-error-continue type="MULE:VALIDATION" doc:name="Handle Validation Error">
+				<logger level="ERROR" doc:name="Log Validation Error" message='#["CONTACT_VALIDATION_FAILED | ContactId=" ++ (vars.contactId default "UNKNOWN") ++ " | Error=" ++ error.description]'/>
+				<flow-ref doc:name="Publish Invalid Message to DLQ" name="contact-dlq-message-publisher-subflow" doc:id="4790531b-6779-43b8-bfad-9c11efd80215"/>
+				<jms:ack doc:name="Acknowledge Invalid Message After DLQ" ackId="#[vars.ackId]"/>
+			</on-error-continue>
+
+			<!-- DataWeave / Expression Errors: Propagate (NO ACK) -->
+			<on-error-propagate type="MULE:EXPRESSION" doc:name="Handle Expression Error">
+				<logger level="ERROR" doc:name="Log Expression Error" message='#["CONTACT_EXPRESSION_ERROR | ContactId=" ++ (vars.contactId default "UNKNOWN") ++ " | Error=" ++ error.description]'/>
+			</on-error-propagate>
+
+			<!-- Connectivity Errors (DB or ActiveMQ down): Propagate (NO ACK) -->
+			<on-error-propagate type="MULE:CONNECTIVITY" doc:name="Handle Connectivity Error">
+				<logger level="ERROR" doc:name="Log Connectivity Error" message='#["CONTACT_CONNECTIVITY_ERROR | ContactId=" ++ (vars.contactId default "UNKNOWN") ++ " | Error=" ++ error.description]'/>
+			</on-error-propagate>
+
+			<!-- Any Other Unexpected Errors: Propagate (NO ACK) -->
+			<on-error-propagate type="ANY" doc:name="Handle Unexpected Error">
+				<logger level="ERROR" doc:name="Log Unexpected Error" message='#["CONTACT_UNEXPECTED_ERROR | ContactId=" ++ (vars.contactId default "UNKNOWN") ++ " | Error=" ++ error.description]'/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>

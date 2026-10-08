@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms" 
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" 
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+
+	<sub-flow name="contact-database-payload-builder-subflow" doc:id="68b67195-0be4-4df0-8adf-8b5e64e615eb">
+		<ee:transform doc:name="Build Contact Onboarding Database Payload" doc:id="12b4c502-671a-415f-8a0f-0227418f42ed">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+    contact_sf_id: payload.contact_sf_id,
+    first_name: payload.first_name,
+    last_name: payload.last_name,
+    email: payload.email,
+    phone: payload.phone,
+    account_id: payload.account_id,
+    job_title: payload.job_title,
+    department: payload.department,
+    reports_to_id: payload.reports_to_id,
+    account_name: payload.account_name,
+    account_industry: payload.account_industry,
+    account_type: payload.account_type,
+    account_revenue: payload.account_revenue,
+    account_contact_count: payload.account_contact_count,
+    contact_priority: payload.contact_priority,
+    modified_date: (payload.modified_date as DateTime) as String { format: "yyyy-MM-dd HH:mm:ss" }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+
+	<sub-flow name="contact-database-upsert-subflow" doc:id="0c9c74f9-f6b2-4d7f-9487-c62ffeda5dc4">
+		<logger level="INFO" doc:name="Log Database Upsert Subflow Reached" doc:id="367364d2-8f30-404e-b960-7297b6af3365" message="DATABASE_UPSERT_SUBFLOW_REACHED"/>
+		
+		<!-- Preserve payload and JMS ackId in flow variables before any DB execution -->
+		<set-variable value="#[payload]" doc:name="Set dbPayload" doc:id="47e42c21-c629-4a8e-99bf-d02e303faf72" variableName="dbPayload"/>
+		<set-variable value="#[attributes.ackId]" doc:name="Set jmsAckId" doc:id="5a4d3ca4-201a-4554-8761-37d743ecce0a" variableName="jmsAckId"/>
+		
+		<!-- Wrap DB operations in Until-Successful -->
+		<until-successful maxRetries="${app.maxRetries}" doc:name="Retrieving the records" doc:id="04208121-80f1-497c-871e-c4ba4e2badcf" millisBetweenRetries="${app.retryInterval}">
+			<db:select doc:name="Retrieve Existing Contact Onboarding Record" doc:id="2e37bd91-b565-4d83-b025-81bdb2f219c6" config-ref="Database_Config" target="existingContact">
+				<db:sql><![CDATA[SELECT contact_sf_id
+FROM contact_onboarding
+WHERE contact_sf_id = :contact_sf_id]]></db:sql>
+				<db:input-parameters><![CDATA[#[{
+ contact_sf_id: vars.dbPayload.contact_sf_id
+}]]]></db:input-parameters>
+			</db:select>
+			</until-successful>
+		<choice doc:name="Evaluate Existing Contact Onboarding Record Availability" doc:id="b4dfecf1-74c8-4aa7-a8c1-742cfd0a5f7c">
+				<!-- Changed to !isEmpty(...) for performance -->
+				<when expression="#[!isEmpty(vars.existingContact)]">
+					<until-successful maxRetries="${app.maxRetries}" doc:name="Updating the records" doc:id="5434969e-c76e-4293-8f4d-76794ce44833" millisBetweenRetries="${app.retryInterva}">
+						<db:update doc:name="Update Contact Onboarding Record" doc:id="746776ae-0b3c-4635-bc84-ea4353f5ab3e" config-ref="Database_Config" target="dbUpdateResult">
+						<db:sql><![CDATA[UPDATE contact_onboarding
+SET
+ first_name = :first_name,
+ last_name = :last_name,
+ email = :email,
+ phone = :phone,
+ account_id = :account_id,
+ job_title = :job_title,
+ department = :department,
+ reports_to_id = :reports_to_id,
+ account_name = :account_name,
+ account_industry = :account_industry,
+ account_type = :account_type,
+ account_revenue = :account_revenue,
+ account_contact_count = :account_contact_count,
+ contact_priority = :contact_priority,
+ modified_date = :modified_date,
+ updated_at = NOW()
+WHERE contact_sf_id = :contact_sf_id]]></db:sql>
+						<db:input-parameters><![CDATA[#[vars.dbPayload]]]></db:input-parameters>
+					</db:update>
+					</until-successful>
+				</when>
+				<otherwise>
+					<until-successful maxRetries="${app.maxRetries}" doc:name="inserting th erecords" doc:id="4cce7d9f-5edf-463c-91c3-5201290da687" millisBetweenRetries="${app.retryInterva}">
+						<db:insert doc:name="Insert Contact Onboarding Record" doc:id="d5c0a792-405f-4544-acdd-835177152f0e" config-ref="Database_Config" target="dbInsertResult">
+						<db:sql><![CDATA[INSERT INTO contact_onboarding
+(
+    contact_sf_id,
+    first_name,
+    last_name,
+    email,
+    phone,
+    account_id,
+    job_title,
+    department,
+    reports_to_id,
+    account_name,
+    account_industry,
+    account_type,
+    account_revenue,
+    account_contact_count,
+    contact_priority,
+    modified_date,
+    created_at,
+    updated_at
+)
+VALUES
+(
+    :contact_sf_id,
+    :first_name,
+    :last_name,
+    :email,
+    :phone,
+    :account_id,
+    :job_title,
+    :department,
+    :reports_to_id,
+    :account_name,
+    :account_industry,
+    :account_type,
+    :account_revenue,
+    :account_contact_count,
+    :contact_priority,
+    :modified_date,
+    NOW(),
+    NOW()
+)]]></db:sql>
+						<db:input-parameters><![CDATA[#[vars.dbPayload]]]></db:input-parameters>
+					</db:insert>
+					</until-successful>
+				</otherwise>
+			</choice>
+		
+		<logger level="INFO" doc:name="Log Contact Onboarding Database Persistence" doc:id="8f514da9-80a6-477d-92bc-5386e3afd408" message='#["CONTACT_ONBOARDING_DATABASE_PERSISTED | CorrelationId=" ++ (vars.correlationId default "")]'/>
+		
+		<!-- Reference stored jmsAckId instead of attributes.ackId -->
+	</sub-flow>
+
+</mule>

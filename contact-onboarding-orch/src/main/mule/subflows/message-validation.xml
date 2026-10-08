@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<sub-flow name="contact-onboarding-message-validation-subflow" doc:id="0f00540b-8824-4867-b869-ad2807696e99" >
+		<validation:is-not-null doc:id="1a67b7f0-7880-41d6-9f6c-f4a273fed260" doc:name="Validate Salesforce Contact Identifier" value="#[payload.contact_sf_id]" message="Salesforce Contact Identifier is missing."/>
+		<validation:is-not-null doc:name="Validate Contact Email Address" doc:id="5d12eeef-1889-40eb-929e-63ab73e6ed4e" value="#[payload.email]" message="Contact Email Address is missing."/>
+		<validation:is-not-null doc:name="Validate Account Identifier" doc:id="ff404d93-ba43-4d46-8f58-f0d97aeb90a3" value="#[payload.account_id]" message="Account Identifier is missing."/>
+	</sub-flow>
+</mule>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
+	<jms:config name="JMS_Config" doc:name="JMS Config" doc:id="d2438acc-4c77-4a28-a536-6e97e1f48414" >
+		<jms:active-mq-connection username="${secure::jms.username}" password="${secure::jms.password}" >
+			<jms:factory-configuration brokerUrl="tcp://localhost:61616"/>
+		</jms:active-mq-connection>
+	</jms:config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="2116270d-cb6a-4687-90c7-73f469c35699">
+	<db:my-sql-connection 
+		host="sql12.freesqldatabase.com" 
+		port="3306" 
+		user="sql12838449" 
+		password="${secure::db.password}" 
+		database="sql12838449" />
+</db:config>
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="6692c541-4be1-42f8-9a57-c8e94a7db92b" file="secure\secure.properties" key="mulesoft1234567890" />
+	<configuration-properties doc:name="Configuration properties" doc:id="7e327b95-3383-49b4-8e5d-a349d52c2fc8" file="config\config-dev.yaml" />
+</mule>

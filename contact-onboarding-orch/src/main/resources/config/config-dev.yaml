@@ -1,0 +1,14 @@
+jms:
+  brokerUrl: "tcp://localhost:61616"
+  queueName: "CONTACT.ONBOARDING.Q"
+  dlqName: "CONTACT.ONBOARDING.DLQ"
+
+db:
+  host: "sql12.freesqldatabase.com" 
+  port: "3306"
+  user: "sql12838449"             
+  database: "sql12838449"         
+
+app:
+  maxRetries: 3
+  retryInterval: 3000

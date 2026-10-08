@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+	<sub-flow name="contact-dlq-message-publisher-subflow" doc:id="90db31b1-2c2b-4021-81f4-fdb545e90649" >
+		<jms:publish doc:name="Publish Contact Onboarding Message To Dead Letter Queue" doc:id="55da2db7-24bb-4fa0-8ee2-b8b299d3435b" config-ref="JMS_Config" destination="${jms.dlqQueueName}"/>
+	</sub-flow>
+</mule>
